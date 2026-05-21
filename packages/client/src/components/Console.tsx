@@ -1,211 +1,72 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { IconChevronDown, IconChevronRight, IconTrash } from './Icons';
 
-interface ConsoleProps {
-  logs: string;
-  onClearLogs: () => void;
-  serverRunning: boolean;
-  onStartServer: () => void;
-  onStopServer: () => void;
-  onRestartServer: () => void;
-  onDbPush: () => Promise<string>;
-  onInstallPackages: (packages: string[]) => Promise<string>;
-}
-
-export default function Console({
-  logs,
-  onClearLogs,
-  serverRunning,
-  onStartServer,
-  onStopServer,
-  onRestartServer,
-  onDbPush,
-  onInstallPackages
-}: ConsoleProps) {
+export default function Console({ logs, onClearLogs, serverRunning, onStartServer, onStopServer, onRestartServer, onDbPush, onInstallPackages }: any) {
   const [isOpen, setIsOpen] = useState(true);
-  const [installInput, setInstallInput] = useState('');
-  const [isInstalling, setIsInstalling] = useState(false);
-  const [isMigrating, setIsMigrating] = useState(false);
+  const [activeTab, setActiveTab] = useState('logs');
+  const [pkgInput, setPkgInput] = useState('');
+  const endRef = useRef<HTMLDivElement>(null);
 
-  const consoleEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (isOpen) endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [logs, isOpen]);
 
-  // Auto-scroll logs to bottom on update
-  useEffect(() => {
-    if (consoleEndRef.current) {
-      consoleEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [logs, isOpen]);
-
-  const handleInstall = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!installInput.trim()) return;
-    setIsInstalling(true);
-    const pkgs = installInput.trim().split(/\s+/);
+  const handleInstall = async () => {
+    if (!pkgInput.trim()) return;
+    const pkgs = pkgInput.split(',').map(p => p.trim());
     await onInstallPackages(pkgs);
-    setInstallInput('');
-    setIsInstalling(false);
+    setPkgInput('');
   };
-
-  const handleDbPush = async () => {
-    setIsMigrating(true);
-    await onDbPush();
-    setIsMigrating(false);
-  };
-
-  if (!isOpen) {
-    return (
-      <div
-        className="glass-panel"
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: '42px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 24px',
-          borderBottomLeftRadius: 0,
-          borderBottomRightRadius: 0,
-          zIndex: 10,
-          borderTop: '1px solid var(--border-color)',
-          background: 'var(--bg-surface)'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span className={`status-indicator ${serverRunning ? 'active' : 'inactive'}`} />
-          <span style={{ fontSize: '12px', fontWeight: 600, letterSpacing: '0.5px' }}>
-            BACKEND: {serverRunning ? 'RUNNING' : 'STOPPED'}
-          </span>
-        </div>
-        <button
-          className="btn"
-          style={{ padding: '4px 12px', fontSize: '12px' }}
-          onClick={() => setIsOpen(true)}
-        >
-          Open Console ▲
-        </button>
-      </div>
-    );
-  }
 
   return (
-    <div
-      className="glass-panel animate-fade-in"
-      style={{
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: '320px',
-        display: 'flex',
-        flexDirection: 'column',
-        borderBottomLeftRadius: 0,
-        borderBottomRightRadius: 0,
-        zIndex: 10,
-        borderTop: '1px solid var(--border-color)',
-        background: 'var(--bg-surface)'
-      }}
-    >
-      {/* Console Controls / Header */}
-      <div
-        style={{
-          padding: '10px 20px',
-          borderBottom: '1px solid var(--border-color)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '12px'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span className={`status-indicator ${serverRunning ? 'active' : 'inactive'}`} />
-            <span style={{ fontSize: '13px', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
-              Elysia Engine
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {serverRunning ? (
-              <button className="btn" style={{ padding: '4px 10px', fontSize: '12px' }} onClick={onStopServer}>
-                Stop
-              </button>
-            ) : (
-              <button className="btn btn-primary" style={{ padding: '4px 10px', fontSize: '12px' }} onClick={onStartServer}>
-                Start
-              </button>
-            )}
-            <button className="btn" style={{ padding: '4px 10px', fontSize: '12px' }} onClick={onRestartServer}>
-              Restart
-            </button>
-          </div>
+    <div className={`fixed bottom-6 left-6 right-6 glass-panel transition-all duration-300 z-50 flex flex-col overflow-hidden ${isOpen ? 'h-[300px]' : 'h-[48px]'}`}>
+      <div className="flex items-center justify-between px-4 h-[48px] border-b border-slate-100 bg-slate-50/50">
+        <div className="flex items-center gap-4">
+          <button className="flex items-center gap-1.5 text-xs font-bold uppercase text-slate-500 hover:text-primary transition-colors" onClick={() => setIsOpen(!isOpen)}>
+            {isOpen ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />} Terminal
+          </button>
+          {isOpen && (
+            <div className="flex gap-1">
+              {['logs', 'packages', 'actions'].map(t => (
+                <button key={t} className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-all ${activeTab === t ? 'bg-blue-500 text-white shadow-sm' : 'text-slate-400 hover:bg-slate-100'}`} onClick={() => setActiveTab(t)}>{t}</button>
+              ))}
+            </div>
+          )}
         </div>
-
-        {/* Database and package controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button
-            className="btn"
-            style={{ padding: '6px 12px', fontSize: '12px', borderColor: 'var(--secondary)' }}
-            onClick={handleDbPush}
-            disabled={isMigrating}
-          >
-            {isMigrating ? 'Syncing Drizzle...' : 'Drizzle Sync (db:push)'}
-          </button>
-
-          {/* Package Installer Form */}
-          <form onSubmit={handleInstall} style={{ display: 'flex', gap: '6px' }}>
-            <input
-              type="text"
-              placeholder="Install packages (e.g. zod bcrypt)"
-              className="input-field"
-              style={{ padding: '6px 12px', fontSize: '12px', width: '220px' }}
-              value={installInput}
-              onChange={(e) => setInstallInput(e.target.value)}
-              disabled={isInstalling}
-            />
-            <button
-              type="submit"
-              className="btn btn-primary"
-              style={{ padding: '6px 12px', fontSize: '12px' }}
-              disabled={isInstalling}
-            >
-              {isInstalling ? 'Installing...' : 'Add Pkg'}
-            </button>
-          </form>
-        </div>
-
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn" style={{ padding: '4px 10px', fontSize: '12px' }} onClick={onClearLogs}>
-            Clear
-          </button>
-          <button className="btn" style={{ padding: '4px 10px', fontSize: '12px' }} onClick={() => setIsOpen(false)}>
-            Minimize ▼
-          </button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-2 py-1 rounded bg-white border border-slate-200 shadow-sm">
+            <div className={`w-2 h-2 rounded-full ${serverRunning ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+            <span className="text-[10px] font-bold uppercase text-slate-500">{serverRunning ? 'Live' : 'Offline'}</span>
+          </div>
+          {isOpen && (
+            <div className="flex gap-1.5">
+              <button className="btn h-7 px-2 text-[10px]" onClick={onRestartServer}>Restart</button>
+              <button className="btn h-7 px-2 text-[10px] border-red-200 text-red-500" onClick={serverRunning ? onStopServer : onStartServer}>{serverRunning ? 'Stop' : 'Start'}</button>
+              <button className="btn h-7 px-2 text-[10px] text-slate-400 border-none bg-transparent hover:bg-slate-200" onClick={onClearLogs}><IconTrash size={12} /></button>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Terminal Output */}
-      <div
-        style={{
-          flex: 1,
-          padding: '16px 20px',
-          overflowY: 'auto',
-          fontFamily: 'var(--font-mono)',
-          fontSize: '12px',
-          lineHeight: '1.6',
-          color: 'var(--color-text)',
-          background: 'var(--bg-terminal)',
-          display: 'flex',
-          flexDirection: 'column'
-        }}
-      >
-        <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-          {logs || 'No logs received yet. Start the backend server to see outputs.'}
-        </pre>
-        <div ref={consoleEndRef} />
-      </div>
+      {isOpen && (
+        <div className="flex-1 overflow-hidden bg-slate-900 font-mono text-[12px] p-4 text-slate-300">
+          {activeTab === 'logs' && (
+            <div className="h-full overflow-y-auto whitespace-pre-wrap break-all pr-2 scrollbar-thin scrollbar-thumb-slate-700">
+              {logs || 'No system logs yet...'}
+              <div ref={endRef} />
+            </div>
+          )}
+          {activeTab === 'packages' && (
+            <div className="flex flex-col gap-4 max-w-lg">
+              <div className="flex flex-col gap-1.5"><label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Install dependencies</label><div className="flex gap-2"><input type="text" className="input-field bg-slate-800 border-slate-700 text-white h-9" placeholder="e.g. lodash, zod, uuid" value={pkgInput} onChange={e => setPkgInput(e.target.value)} /><button className="btn btn-primary h-9 px-4" onClick={handleInstall}>Install</button></div><span className="text-[10px] text-slate-500 italic">Separate multiple packages with commas.</span></div>
+              <div className="p-3 bg-slate-800/50 rounded border border-slate-700/50 text-[11px] text-slate-400">Backy uses **Bun** internally. Installed packages are automatically available in your logic blocks.</div>
+            </div>
+          )}
+          {activeTab === 'actions' && (
+            <div className="grid grid-cols-2 gap-3 max-w-xl">
+              <div className="p-3 bg-slate-800/50 rounded border border-slate-700/50 flex flex-col gap-2"><h4 className="text-[11px] font-bold text-slate-400 uppercase">Database Tools</h4><button className="btn bg-slate-700 border-slate-600 text-white h-8 text-[11px] hover:bg-slate-600" onClick={onDbPush}>Force Drizzle Sync</button></div>
+              <div className="p-3 bg-slate-800/50 rounded border border-slate-700/50 flex flex-col gap-2"><h4 className="text-[11px] font-bold text-slate-400 uppercase">Project Utilities</h4><button className="btn bg-slate-700 border-slate-600 text-white h-8 text-[11px] hover:bg-slate-600" onClick={() => window.location.reload()}>Hard Reset UI</button></div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
