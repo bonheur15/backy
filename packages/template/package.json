@@ -1,0 +1,21 @@
+{
+  "name": "backy-template",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "db:push": "bun x drizzle-kit push:sqlite"
+  },
+  "dependencies": {
+    "@elysiajs/cors": "^1.0.2",
+    "@elysiajs/jwt": "^1.0.2",
+    "elysia": "^1.0.12"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "drizzle-kit": "^0.21.2",
+    "drizzle-orm": "^0.30.10",
+    "typescript": "^5.4.5"
+  }
+}
