@@ -1,0 +1,14 @@
+{
+  "name": "backy-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:server": "bun --hot packages/server/src/index.ts",
+    "dev:client": "bun --cwd packages/client run dev",
+    "build:client": "bun --cwd packages/client run build",
+    "start": "bun packages/server/src/index.ts",
+    "dev": "bun run dev:server"
+  }
+}
