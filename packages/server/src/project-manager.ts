@@ -167,7 +167,7 @@ export class ProjectManager {
   /**
    * Synchronizes an endpoint visually edited to the physical route file
    */
-  async syncEndpoint(endpoint: Endpoint): Promise<void> {
+  async syncEndpoint(endpoint: Endpoint, metadata: ProjectMetadata): Promise<void> {
     const routeFilename = `${endpoint.method}_${endpoint.name}.ts`;
     const routesDir = join(this.projectPath, 'src/routes');
     if (!existsSync(routesDir)) {
@@ -195,6 +195,27 @@ export class ProjectManager {
     // [BACKY_AUTH_END]`;
     }
 
+    // Resolve chained logic blocks from visual connections
+    const chainedLogic: string[] = [];
+    const usedBlocks = new Set<string>();
+
+    if (metadata.connections && metadata.logicBlocks) {
+      // Find connections where 'fromNodeId' is this endpoint
+      const outgoing = metadata.connections.filter(c => c.fromNodeId === endpoint.id);
+      
+      for (const conn of outgoing) {
+        const targetBlock = metadata.logicBlocks.find(b => b.id === conn.toNodeId);
+        if (targetBlock) {
+          usedBlocks.add(targetBlock.name);
+          
+          // Map inputs from endpoint/request to block inputs
+          // Simple implementation: pass 'body' and 'query' to blocks
+          chainedLogic.push(`    // Chained Logic: ${targetBlock.name}`);
+          chainedLogic.push(`    const result_${targetBlock.name} = await logic.${targetBlock.name}({ ...body, ...query });`);
+        }
+      }
+    }
+
     const fileContent = `import { Elysia, t } from 'elysia';
 import { db } from '../db/db';
 import * as schema from '../db/schema';
@@ -206,6 +227,8 @@ ${authLogic}
     // [BACKY_LOG_START]
     console.log('[Backy] Request:', { method: '${endpoint.method}', path: '${endpoint.path}', body, query });
     // [BACKY_LOG_END]
+
+${chainedLogic.join('\n')}
 
     // [BACKY_LOGIC_START]
 ${endpoint.logic}
@@ -297,7 +320,7 @@ ${endpoint.logic}
   /**
    * Synchronizes visual logic blocks to src/utils/
    */
-  async syncLogicBlocks(blocks: LogicBlock[]): Promise<void> {
+  async syncLogicBlocks(blocks: LogicBlock[], metadata: ProjectMetadata): Promise<void> {
     const utilsDir = join(this.projectPath, 'src/utils');
     if (!existsSync(utilsDir)) {
       mkdirSync(utilsDir, { recursive: true });
@@ -319,10 +342,30 @@ ${endpoint.logic}
         return `${i.name}${i.required === false ? '?' : ''}: ${tsType}`;
       }).join(', ');
 
+      // Resolve chained calls (Logic Block -> Logic Block)
+      const chainedLogic: string[] = [];
+      if (metadata.connections) {
+        const outgoing = metadata.connections.filter(c => c.fromNodeId === block.id);
+        for (const conn of outgoing) {
+          const target = blocks.find(b => b.id === conn.toNodeId);
+          if (target) {
+            chainedLogic.push(`  // Chained Logic: ${target.name}`);
+            chainedLogic.push(`  const result_${target.name} = await ${target.name}({ ...args });`);
+          }
+        }
+      }
+
       const fileContent = `import { db } from '../db/db';
 import * as schema from '../db/schema';
+import { ${blocks.map(b => b.name).filter(n => n !== block.name).join(', ')} } from './index';
 
-export const ${block.name} = async (${inputArgs}) => {
+export const ${block.name} = async (${inputArgs.length > 0 ? `args: { ${inputArgs} }` : ''}) => {
+  const { ${block.inputs.map(i => i.name).join(', ')} } = ${inputArgs.length > 0 ? 'args' : '{}'};
+
+  // [BACKY_CHAINED_START]
+${chainedLogic.join('\n')}
+  // [BACKY_CHAINED_END]
+
   // [BACKY_LOGIC_START]
 ${block.logic}
   // [BACKY_LOGIC_END]

@@ -527,22 +527,20 @@ async function handleAPI(req: Request, url: URL): Promise<Response> {
       await manager.syncDatabaseSchema(body.dbModels);
 
       for (const ep of body.endpoints) {
-        await manager.syncEndpoint(ep);
+        await manager.syncEndpoint(ep, body);
       }
       await manager.syncIndexImports();
-      await manager.syncLogicBlocks(body.logicBlocks || []);
-
+      await manager.syncLogicBlocks(body.logicBlocks || [], body);
       // Trigger Git auto commit if enabled
       checkTriggerAutoCommit();
 
       return Response.json({ status: 'ok' }, { headers: corsHeaders });
     }
-
     if (url.pathname === '/api/endpoints/sync' && req.method === 'POST') {
       const body = await req.json();
-      await manager.syncEndpoint(body.endpoint);
-
       const meta = await manager.getMetadata();
+      await manager.syncEndpoint(body.endpoint, meta);
+
       const idx = meta.endpoints.findIndex(e => e.id === body.endpoint.id);
       if (idx !== -1) {
         meta.endpoints[idx] = body.endpoint;
