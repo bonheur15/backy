@@ -3,490 +3,100 @@ import type { Endpoint, DBModel } from '../types';
 import CodeEditor from './CodeEditor';
 import { IconX } from './Icons';
 
-interface EndpointWizardModalProps {
-  isOpen: boolean;
-  endpoint: Endpoint | null; // null if creating new
-  onClose: () => void;
-  onSave: (endpoint: Endpoint) => void;
-  x?: number;
-  y?: number;
-}
-
-export function EndpointWizardModal({
-  isOpen,
-  endpoint,
-  onClose,
-  onSave,
-  x = 100,
-  y = 100
-}: EndpointWizardModalProps) {
+export function EndpointWizardModal({ isOpen, endpoint, onClose, onSave, x = 100, y = 100 }: any) {
   const [step, setStep] = useState(1);
-  const [name, setName] = useState('');
-  const [path, setPath] = useState('');
-  const [method, setMethod] = useState<'get' | 'post' | 'put' | 'delete'>('get');
-  const [queryFields, setQueryFields] = useState<{ name: string; type: string; required?: boolean }[]>([]);
-  const [bodyFields, setBodyFields] = useState<{ name: string; type: string; required?: boolean }[]>([]);
-  const [responseFields, setResponseFields] = useState<{ name: string; type: string; required?: boolean }[]>([]);
-  const [logic, setLogic] = useState('');
-  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [form, setForm] = useState<any>({ name: '', path: '', method: 'get', query: [], body: [], response: [{ name: 'status', type: 'string', required: true }], logic: 'return { status: "ok" };', isAuthorized: false });
 
-  // Load endpoint data if editing
   useEffect(() => {
-    if (endpoint) {
-      setName(endpoint.name);
-      setPath(endpoint.path);
-      setMethod(endpoint.method);
-      setQueryFields(endpoint.inputs.query || []);
-      setBodyFields(endpoint.inputs.body || []);
-      setResponseFields(endpoint.outputs.response || []);
-      setLogic(endpoint.logic);
-      setIsAuthorized(!!endpoint.isAuthorized);
-      setStep(1);
-    } else {
-      setName('');
-      setPath('');
-      setMethod('get');
-      setQueryFields([]);
-      setBodyFields([]);
-      setResponseFields([
-        { name: 'status', type: 'string', required: true }
-      ]);
-      setLogic('return {\n  status: "ok"\n};');
-      setIsAuthorized(false);
-      setStep(1);
-    }
+    if (endpoint) setForm({ ...endpoint, query: endpoint.inputs.query, body: endpoint.inputs.body, response: endpoint.outputs.response });
+    else setForm({ name: '', path: '', method: 'get', query: [], body: [], response: [{ name: 'status', type: 'string', required: true }], logic: 'return { status: "ok" };', isAuthorized: false });
+    setStep(1);
   }, [endpoint, isOpen]);
 
   if (!isOpen) return null;
 
-  const handleNext = () => {
-    if (step === 1 && (!name || !path)) return;
-    setStep(s => Math.min(s + 1, 4));
-  };
-
-  const handleBack = () => {
-    setStep(s => Math.max(s - 1, 1));
-  };
-
   const handleSave = () => {
-    const finalEndpoint: Endpoint = {
-      id: endpoint?.id || `${method}_${name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
-      name: name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
-      method,
-      path: path.startsWith('/') ? path : `/${path}`,
-      inputs: {
-        query: queryFields,
-        body: bodyFields
-      },
-      outputs: {
-        response: responseFields
-      },
-      logic,
-      position: endpoint?.position || { x, y },
-      isAuthorized
-    };
-    onSave(finalEndpoint);
+    onSave({ id: endpoint?.id || `${form.method}_${form.name.toLowerCase()}`, ...form, name: form.name.toLowerCase(), inputs: { query: form.query, body: form.body }, outputs: { response: form.response }, position: endpoint?.position || { x, y } });
   };
 
-  const addField = (target: 'query' | 'body' | 'response') => {
-    const newField = { name: '', type: 'string', required: true };
-    if (target === 'query') setQueryFields([...queryFields, newField]);
-    if (target === 'body') setBodyFields([...bodyFields, newField]);
-    if (target === 'response') setResponseFields([...responseFields, newField]);
-  };
-
-  const removeField = (target: 'query' | 'body' | 'response', index: number) => {
-    if (target === 'query') setQueryFields(queryFields.filter((_, i) => i !== index));
-    if (target === 'body') setBodyFields(bodyFields.filter((_, i) => i !== index));
-    if (target === 'response') setResponseFields(responseFields.filter((_, i) => i !== index));
-  };
-
-  const updateField = (target: 'query' | 'body' | 'response', index: number, key: string, val: any) => {
-    const list = target === 'query' ? [...queryFields] : target === 'body' ? [...bodyFields] : [...responseFields];
-    list[index] = { ...list[index], [key]: val };
-    if (target === 'query') setQueryFields(list);
-    if (target === 'body') setBodyFields(list);
-    if (target === 'response') setResponseFields(list);
-  };
-
-  const renderFieldEditor = (title: string, target: 'query' | 'body' | 'response', fields: any[]) => {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h4 style={{ color: 'var(--primary)', fontSize: '14px', fontWeight: 600 }}>{title}</h4>
-          <button className="btn" style={{ height: '28px', padding: '0 8px', fontSize: '11px' }} onClick={() => addField(target)}>
-            + Add Field
-          </button>
-        </div>
-        {fields.length === 0 ? (
-          <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed var(--border-color)', color: 'var(--color-dim)', fontSize: '12px', textAlign: 'center' }}>
-            No fields defined. (Optional)
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {fields.map((f, idx) => (
-              <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input
-                  type="text"
-                  placeholder="Field Name"
-                  className="input-field input-field-mono"
-                  style={{ flex: 2, height: '34px' }}
-                  value={f.name}
-                  onChange={(e) => updateField(target, idx, 'name', e.target.value)}
-                />
-                <select
-                  className="input-field"
-                  style={{ flex: 1, height: '34px' }}
-                  value={f.type}
-                  onChange={(e) => updateField(target, idx, 'type', e.target.value)}
-                >
-                  <option value="string">string</option>
-                  <option value="number">number</option>
-                  <option value="boolean">boolean</option>
-                  <option value="any">any</option>
-                </select>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--color-muted)', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={f.required !== false}
-                    onChange={(e) => updateField(target, idx, 'required', e.target.checked)}
-                  />
-                  Req
-                </label>
-                <button
-                  className="btn btn-danger"
-                  style={{ width: '34px', height: '34px', padding: 0 }}
-                  onClick={() => removeField(target, idx)}
-                >
-                  <IconX size={12} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+  const renderFields = (title: string, key: string) => (
+    <div className="flex flex-col gap-3">
+      <div className="flex justify-between items-center">
+        <h4 className="text-primary text-sm font-bold">{title}</h4>
+        <button className="btn h-7 px-2 text-[11px]" onClick={() => setForm({ ...form, [key]: [...form[key], { name: '', type: 'string', required: true }] })}>+ Add Field</button>
       </div>
-    );
-  };
+      <div className="flex flex-col gap-2">
+        {form[key].map((f: any, i: number) => (
+          <div key={i} className="flex gap-2 items-center bg-slate-50 p-2 rounded border border-slate-100">
+            <input type="text" placeholder="Name" className="input-field input-field-mono h-8 flex-[2]" value={f.name} onChange={e => { const up = [...form[key]]; up[i].name = e.target.value; setForm({ ...form, [key]: up }); }} />
+            <select className="input-field h-8 flex-1" value={f.type} onChange={e => { const up = [...form[key]]; up[i].type = e.target.value; setForm({ ...form, [key]: up }); }}><option value="string">string</option><option value="number">number</option><option value="boolean">boolean</option></select>
+            <button className="btn btn-danger w-8 h-8 p-0" onClick={() => setForm({ ...form, [key]: form[key].filter((_: any, idx: number) => idx !== i) })}><IconX size={12} /></button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-content animate-fade-in" style={{ maxWidth: step === 4 ? '900px' : '600px' }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: 600 }}>
-                {endpoint ? 'Edit Endpoint' : 'Create New Endpoint'}
-              </h3>
-              <span style={{ fontSize: '12px', color: 'var(--color-dim)', fontFamily: 'var(--font-mono)' }}>
-                Step {step} of 4
-              </span>
-            </div>
-            {/* Progress Tracker */}
-            <div style={{ display: 'flex', height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden', marginTop: '8px' }}>
-              <div style={{ width: `${(step / 4) * 100}%`, background: 'var(--primary)', transition: 'width 0.3s ease' }} />
-            </div>
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-5" onClick={onClose}>
+      <div className="w-full max-w-[600px] bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden flex flex-col animate-in zoom-in-95 duration-150" onClick={e => e.stopPropagation()} style={{ maxWidth: step === 4 ? '900px' : '600px' }}>
+        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-lg font-bold">{endpoint ? 'Edit' : 'Create'} Endpoint</h3>
+            <span className="text-xs text-slate-400 font-mono">Step {step} of 4</span>
           </div>
+          <div className="h-1 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-primary transition-all duration-300" style={{ width: `${(step / 4) * 100}%` }} /></div>
         </div>
-
-        <div className="modal-body">
-          {/* Step 1: Basic endpoint settings */}
+        <div className="p-6 overflow-y-auto max-h-[70vh]">
           {step === 1 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div className="form-group">
-                <label className="form-label">Endpoint Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. get_users, create_todo"
-                  className="input-field input-field-mono"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  autoFocus
-                />
-                <span style={{ fontSize: '11px', color: 'var(--color-dim)' }}>Must be valid variable name.</span>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">HTTP Method</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {(['get', 'post', 'put', 'delete'] as const).map(m => (
-                    <button
-                      key={m}
-                      className="btn"
-                      style={{
-                        flex: 1,
-                        textTransform: 'uppercase',
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: '12px',
-                        borderColor: method === m ? `var(--color-${m})` : 'var(--border-color)',
-                        background: method === m ? `var(--color-${m})22` : 'white',
-                        color: method === m ? `var(--color-${m})` : 'var(--color-text)'
-                      }}
-                      onClick={() => setMethod(m)}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Route Path</label>
-                <input
-                  type="text"
-                  placeholder="e.g. /users, /todos/:id"
-                  className="input-field input-field-mono"
-                  value={path}
-                  onChange={(e) => setPath(e.target.value)}
-                />
-                <span style={{ fontSize: '11px', color: 'var(--color-dim)' }}>Use colon for params, like <code>/users/:id</code>.</span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', background: '#f8fafc', borderRadius: '10px', border: '1px solid var(--border-color)', marginTop: '4px' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text)' }}>Require Authentication</div>
-                  <div style={{ fontSize: '12px', color: 'var(--color-muted)' }}>Only allows requests with a valid JWT token.</div>
-                </div>
-                <input
-                  type="checkbox"
-                  style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                  checked={isAuthorized}
-                  onChange={(e) => setIsAuthorized(e.target.checked)}
-                />
-              </div>
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-1.5"><label className="text-xs font-bold text-slate-500 uppercase">Name</label><input type="text" className="input-field input-field-mono" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} autoFocus /></div>
+              <div className="flex flex-col gap-1.5"><label className="text-xs font-bold text-slate-500 uppercase">Method</label><div className="flex gap-2">{['get', 'post', 'put', 'delete'].map(m => <button key={m} className={`btn flex-1 uppercase font-mono text-[11px] ${form.method === m ? 'border-primary bg-blue-50 text-primary' : ''}`} onClick={() => setForm({ ...form, method: m })}>{m}</button>)}</div></div>
+              <div className="flex flex-col gap-1.5"><label className="text-xs font-bold text-slate-500 uppercase">Path</label><input type="text" className="input-field input-field-mono" value={form.path} onChange={e => setForm({ ...form, path: e.target.value })} /></div>
+              <label className="flex items-center gap-3 p-3 bg-slate-50 rounded border border-slate-100 cursor-pointer"><div className="flex-1"><div className="text-sm font-bold">Authentication</div><div className="text-[11px] text-slate-500">Requires valid JWT token</div></div><input type="checkbox" className="w-5 h-5" checked={form.isAuthorized} onChange={e => setForm({ ...form, isAuthorized: e.target.checked })} /></label>
             </div>
           )}
-
-          {/* Step 2: Inputs (Query & Body) */}
-          {step === 2 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {renderFieldEditor('Query Parameters (query)', 'query', queryFields)}
-              <div style={{ height: '1px', background: 'var(--border-color)' }} />
-              {method !== 'get' ? (
-                renderFieldEditor('JSON Body Payload (body)', 'body', bodyFields)
-              ) : (
-                <div style={{ padding: '20px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed var(--border-color)', color: 'var(--color-dim)', fontSize: '13px', textAlign: 'center' }}>
-                  Body payload is not supported for HTTP GET method.
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Step 3: Outputs */}
-          {step === 3 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {renderFieldEditor('Response Body (JSON)', 'response', responseFields)}
-              <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid var(--border-color)', color: 'var(--color-muted)', fontSize: '12px' }}>
-                <strong>Pro-tip:</strong> Defining response structures enables automatic TypeBox validation and better client-side type safety.
-              </div>
-            </div>
-          )}
-
-          {/* Step 4: Logic Editor */}
-          {step === 4 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', height: '400px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <label className="form-label">Endpoint Logic (TypeScript)</label>
-                <div style={{ fontSize: '11px', color: 'var(--color-dim)', fontFamily: 'var(--font-mono)' }}>
-                  Available: body, query, params, db, schema, logic
-                </div>
-              </div>
-              <div style={{ flex: 1, border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
-                <CodeEditor
-                  value={logic}
-                  onChange={setLogic}
-                  onSave={handleSave}
-                  language="typescript"
-                />
-              </div>
-            </div>
-          )}
+          {step === 2 && <div className="flex flex-col gap-6">{renderFields('Query Params', 'query')}<div className="h-px bg-slate-100" />{form.method !== 'get' ? renderFields('JSON Body', 'body') : <div className="p-4 bg-slate-50 text-slate-400 text-xs text-center rounded border border-dashed border-slate-200">Body not supported for GET</div>}</div>}
+          {step === 3 && renderFields('Response Body', 'response')}
+          {step === 4 && <div className="h-[400px] flex flex-col gap-2"><label className="text-xs font-bold text-slate-500 uppercase">Logic (TS)</label><div className="flex-1 border rounded overflow-hidden"><CodeEditor value={form.logic} onChange={v => setForm({ ...form, logic: v })} language="typescript" /></div></div>}
         </div>
-
-        <div className="modal-footer">
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-between">
           <button className="btn" onClick={onClose}>Cancel</button>
-          <div style={{ flex: 1 }} />
-          {step > 1 && (
-            <button className="btn" onClick={handleBack}>Back</button>
-          )}
-          {step < 4 ? (
-            <button className="btn btn-primary" onClick={handleNext} disabled={!name || !path}>
-              Next Step
-            </button>
-          ) : (
-            <button className="btn btn-primary" onClick={handleSave}>
-              {endpoint ? 'Update Endpoint' : 'Create Endpoint'}
-            </button>
-          )}
+          <div className="flex gap-2">
+            {step > 1 && <button className="btn" onClick={() => setStep(s => s - 1)}>Back</button>}
+            <button className="btn btn-primary" onClick={step < 4 ? () => setStep(s => s + 1) : handleSave} disabled={!form.name || !form.path}>{step < 4 ? 'Next' : 'Save'}</button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-interface DBModelModalProps {
-  isOpen: boolean;
-  model: DBModel | null;
-  onClose: () => void;
-  onSave: (model: DBModel) => void;
-  onPushChanges?: () => void;
-  x?: number;
-  y?: number;
-}
-
-export function DBModelModal({
-  isOpen,
-  model,
-  onClose,
-  onSave,
-  onPushChanges,
-  x = 100,
-  y = 100
-}: DBModelModalProps) {
-  const [name, setName] = useState('');
-  const [columns, setColumns] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (model) {
-      setName(model.name);
-      setColumns(model.columns || []);
-    } else {
-      setName('');
-      setColumns([
-        { name: 'id', type: 'integer', primaryKey: true, autoIncrement: true }
-      ]);
-    }
-  }, [model, isOpen]);
-
+export function DBModelModal({ isOpen, model, onClose, onSave, onPushChanges, x = 100, y = 100 }: any) {
+  const [form, setForm] = useState<any>({ name: '', columns: [{ name: 'id', type: 'integer', primaryKey: true, autoIncrement: true }] });
+  useEffect(() => { if (model) setForm(model); else setForm({ name: '', columns: [{ name: 'id', type: 'integer', primaryKey: true, autoIncrement: true }] }); }, [model, isOpen]);
   if (!isOpen) return null;
-
-  const handleSave = () => {
-    if (!name || columns.length === 0) return;
-    const finalModel: DBModel = {
-      id: model?.id || name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
-      name: name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
-      columns: columns.map(c => ({
-        ...c,
-        name: c.name.replace(/[^a-zA-Z0-9_]/g, '')
-      })),
-      position: model?.position || { x, y }
-    };
-    onSave(finalModel);
-  };
-
-  const addColumn = () => {
-    setColumns([...columns, { name: '', type: 'text', notNull: false }]);
-  };
-
-  const removeColumn = (index: number) => {
-    setColumns(columns.filter((_, i) => i !== index));
-  };
-
-  const updateColumn = (index: number, key: string, val: any) => {
-    const list = [...columns];
-    list[index] = { ...list[index], [key]: val };
-    setColumns(list);
-  };
-
+  const handleSave = () => onSave({ ...form, id: model?.id || form.name.toLowerCase(), name: form.name.toLowerCase(), position: model?.position || { x, y } });
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-content animate-fade-in" style={{ maxWidth: '800px' }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3 style={{ fontSize: '18px', fontWeight: 600 }}>
-            {model ? 'Edit Database Table' : 'Create New Database Table'}
-          </h3>
-          {model && onPushChanges && (
-            <button 
-              className="btn btn-primary" 
-              style={{ height: '32px', fontSize: '12px' }}
-              onClick={onPushChanges}
-            >
-              Push Changes to DB
-            </button>
-          )}
-        </div>
-
-        <div className="modal-body">
-          <div className="form-group">
-            <label className="form-label">Table Name</label>
-            <input
-              type="text"
-              placeholder="e.g. users, products, tasks"
-              className="input-field input-field-mono"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoFocus
-            />
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h4 style={{ color: 'var(--color-muted)', fontSize: '14px', fontWeight: 600 }}>Columns & Fields</h4>
-              <button className="btn" style={{ height: '28px', padding: '0 8px', fontSize: '11px' }} onClick={addColumn}>
-                + Add Column
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {columns.map((c, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center', background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                  <input
-                    type="text"
-                    placeholder="Name"
-                    className="input-field input-field-mono"
-                    style={{ flex: 1, height: '34px' }}
-                    value={c.name}
-                    onChange={(e) => updateColumn(idx, 'name', e.target.value)}
-                  />
-                  <select
-                    className="input-field"
-                    style={{ width: '100px', height: '34px' }}
-                    value={c.type}
-                    onChange={(e) => updateColumn(idx, 'type', e.target.value)}
-                  >
-                    <option value="integer">integer</option>
-                    <option value="text">text</option>
-                    <option value="real">real</option>
-                  </select>
-
-                  <div style={{ display: 'flex', gap: '10px', padding: '0 4px' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-muted)', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={c.primaryKey} onChange={(e) => updateColumn(idx, 'primaryKey', e.target.checked)} />
-                      PK
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-muted)', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={c.notNull} onChange={(e) => updateColumn(idx, 'notNull', e.target.checked)} />
-                      NN
-                    </label>
-                  </div>
-
-                  <input
-                    type="text"
-                    placeholder="Default"
-                    className="input-field input-field-mono"
-                    style={{ width: '100px', height: '34px' }}
-                    value={c.default || ''}
-                    onChange={(e) => updateColumn(idx, 'default', e.target.value)}
-                  />
-
-                  <button
-                    className="btn btn-danger"
-                    style={{ width: '34px', height: '34px', padding: 0 }}
-                    onClick={() => removeColumn(idx)}
-                  >
-                    <IconX size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-5" onClick={onClose}>
+      <div className="w-full max-w-[800px] bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden flex flex-col animate-in zoom-in-95 duration-150" onClick={e => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center"><h3 className="text-lg font-bold">{model ? 'Edit' : 'Create'} Table</h3>{model && onPushChanges && <button className="btn btn-primary h-8 text-[11px]" onClick={onPushChanges}>Push Changes</button>}</div>
+        <div className="p-6 flex flex-col gap-6 overflow-y-auto max-h-[70vh]">
+          <div className="flex flex-col gap-1.5"><label className="text-xs font-bold text-slate-500 uppercase">Table Name</label><input type="text" className="input-field input-field-mono" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} autoFocus /></div>
+          <div className="flex flex-col gap-3">
+            <div className="flex justify-between items-center"><h4 className="text-slate-500 text-sm font-bold uppercase">Columns</h4><button className="btn h-7 px-2 text-[11px]" onClick={() => setForm({ ...form, columns: [...form.columns, { name: '', type: 'text' }] })}>+ Add Column</button></div>
+            <div className="flex flex-col gap-2">{form.columns.map((c: any, i: number) => (
+              <div key={i} className="flex gap-2 items-center bg-slate-50 p-3 rounded border border-slate-100">
+                <input type="text" placeholder="Name" className="input-field input-field-mono h-8 flex-1" value={c.name} onChange={e => { const up = [...form.columns]; up[i].name = e.target.value; setForm({ ...form, columns: up }); }} />
+                <select className="input-field h-8 w-28" value={c.type} onChange={e => { const up = [...form.columns]; up[i].type = e.target.value; setForm({ ...form, columns: up }); }}><option value="integer">integer</option><option value="text">text</option><option value="real">real</option></select>
+                <div className="flex gap-3 px-2 text-[11px] font-bold text-slate-500"><label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={!!c.primaryKey} onChange={e => { const up = [...form.columns]; up[i].primaryKey = e.target.checked; setForm({ ...form, columns: up }); }} /> PK</label><label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={!!c.notNull} onChange={e => { const up = [...form.columns]; up[i].notNull = e.target.checked; setForm({ ...form, columns: up }); }} /> NN</label></div>
+                <input type="text" placeholder="Default" className="input-field input-field-mono h-8 w-32" value={c.default || ''} onChange={e => { const up = [...form.columns]; up[i].default = e.target.value; setForm({ ...form, columns: up }); }} />
+                <button className="btn btn-danger w-8 h-8 p-0" onClick={() => setForm({ ...form, columns: form.columns.filter((_: any, idx: number) => idx !== i) })}><IconX size={12} /></button>
+              </div>
+            ))}</div>
           </div>
         </div>
-
-        <div className="modal-footer">
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={!name || columns.length === 0}>
-            Save Table
-          </button>
-        </div>
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2"><button className="btn" onClick={onClose}>Cancel</button><button className="btn btn-primary px-6" onClick={handleSave} disabled={!form.name || form.columns.length === 0}>Save Table</button></div>
       </div>
     </div>
   );

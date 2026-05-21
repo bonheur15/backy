@@ -3,237 +3,35 @@ import type { LogicBlock } from '../types';
 import CodeEditor from './CodeEditor';
 import { IconX } from './Icons';
 
-interface LogicBlockModalProps {
-  isOpen: boolean;
-  block: LogicBlock | null;
-  onClose: () => void;
-  onSave: (block: LogicBlock) => void;
-  x?: number;
-  y?: number;
-}
-
-export function LogicBlockModal({
-  isOpen,
-  block,
-  onClose,
-  onSave,
-  x = 100,
-  y = 100
-}: LogicBlockModalProps) {
-  const [step, setStep] = useState(1);
-  const [name, setName] = useState('');
-  const [inputFields, setInputFields] = useState<{ name: string; type: string; required?: boolean }[]>([]);
-  const [outputFields, setOutputFields] = useState<{ name: string; type: string; required?: boolean }[]>([]);
-  const [logic, setLogic] = useState('');
-
-  // Load logic block data if editing
-  useEffect(() => {
-    if (block) {
-      setName(block.name);
-      setInputFields(block.inputs || []);
-      setOutputFields(block.outputs || []);
-      setLogic(block.logic);
-      setStep(1);
-    } else {
-      setName('');
-      setInputFields([{ name: 'id', type: 'number', required: true }]);
-      setOutputFields([{ name: 'result', type: 'any', required: true }]);
-      setLogic('return {\n  result: true\n};');
-      setStep(1);
-    }
-  }, [block, isOpen]);
-
+export function LogicBlockModal({ isOpen, block, onClose, onSave, x = 100, y = 100 }: any) {
+  const [form, setForm] = useState<any>({ name: '', inputs: [], outputs: [], logic: '// Write your logic here\n', isFavorite: false });
+  useEffect(() => { if (block) setForm(block); else setForm({ name: '', inputs: [], outputs: [], logic: '// Write your logic here\n', isFavorite: false }); }, [block, isOpen]);
   if (!isOpen) return null;
-
-  const handleNext = () => {
-    if (step === 1 && !name) return;
-    setStep(s => Math.min(s + 1, 3));
-  };
-
-  const handleBack = () => {
-    setStep(s => Math.max(s - 1, 1));
-  };
-
-  const handleSave = () => {
-    const finalBlock: LogicBlock = {
-      id: block?.id || `block_${name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`,
-      name: name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
-      inputs: inputFields,
-      outputs: outputFields,
-      logic,
-      position: block?.position || { x, y },
-      isFavorite: block?.isFavorite || false
-    };
-    onSave(finalBlock);
-  };
-
-  const addField = (target: 'input' | 'output') => {
-    const newField = { name: '', type: 'string', required: true };
-    if (target === 'input') setInputFields([...inputFields, newField]);
-    if (target === 'output') setOutputFields([...outputFields, newField]);
-  };
-
-  const removeField = (target: 'input' | 'output', index: number) => {
-    if (target === 'input') setInputFields(inputFields.filter((_, i) => i !== index));
-    if (target === 'output') setOutputFields(outputFields.filter((_, i) => i !== index));
-  };
-
-  const updateField = (target: 'input' | 'output', index: number, key: string, val: any) => {
-    const list = target === 'input' ? [...inputFields] : [...outputFields];
-    list[index] = { ...list[index], [key]: val };
-    if (target === 'input') setInputFields(list);
-    if (target === 'output') setOutputFields(list);
-  };
-
-  const renderFieldEditor = (title: string, target: 'input' | 'output', fields: any[]) => {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h4 style={{ color: 'var(--accent)', fontSize: '14px', letterSpacing: '0.5px' }}>{title}</h4>
-          <button className="btn" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={() => addField(target)}>
-            + Add Field
-          </button>
+  const handleSave = () => onSave({ ...form, id: block?.id || `block_${Date.now()}`, position: block?.position || { x, y } });
+  const renderFields = (title: string, key: string) => (
+    <div className="flex flex-col gap-3">
+      <div className="flex justify-between items-center"><h4 className="text-slate-500 text-xs font-bold uppercase">{title}</h4><button className="btn h-7 px-2 text-[11px]" onClick={() => setForm({ ...form, [key]: [...form[key], { name: '', type: 'string' }] })}>+ Add</button></div>
+      <div className="flex flex-col gap-2">{form[key].map((f: any, i: number) => (
+        <div key={i} className="flex gap-2 items-center bg-slate-50 p-2 rounded border border-slate-100">
+          <input type="text" placeholder="Name" className="input-field input-field-mono h-8 flex-1" value={f.name} onChange={e => { const up = [...form[key]]; up[i].name = e.target.value; setForm({ ...form, [key]: up }); }} />
+          <select className="input-field h-8 w-24" value={f.type} onChange={e => { const up = [...form[key]]; up[i].type = e.target.value; setForm({ ...form, [key]: up }); }}><option value="string">string</option><option value="number">number</option><option value="boolean">boolean</option><option value="any">any</option></select>
+          <button className="btn btn-danger w-8 h-8 p-0" onClick={() => setForm({ ...form, [key]: form[key].filter((_: any, idx: number) => idx !== i) })}><IconX size={12} /></button>
         </div>
-        {fields.length === 0 ? (
-          <div style={{ color: 'var(--color-dim)', fontSize: '13px', fontStyle: 'italic' }}>No fields defined. (Optional)</div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {fields.map((f, idx) => (
-              <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input
-                  type="text"
-                  placeholder="Field Name"
-                  className="input-field"
-                  style={{ flex: 2, padding: '6px 10px', fontSize: '13px' }}
-                  value={f.name}
-                  onChange={(e) => updateField(target, idx, 'name', e.target.value)}
-                />
-                <select
-                  className="input-field"
-                  style={{ flex: 1, padding: '6px 10px', fontSize: '13px' }}
-                  value={f.type}
-                  onChange={(e) => updateField(target, idx, 'type', e.target.value)}
-                >
-                  <option value="string">string</option>
-                  <option value="number">number</option>
-                  <option value="boolean">boolean</option>
-                  <option value="any">any</option>
-                </select>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--color-muted)', userSelect: 'none' }}>
-                  <input
-                    type="checkbox"
-                    checked={f.required !== false}
-                    onChange={(e) => updateField(target, idx, 'required', e.target.checked)}
-                  />
-                  Req
-                </label>
-                <button
-                  className="btn"
-                  style={{ padding: '6px 10px', border: '1px solid rgba(239, 68, 68, 0.2)', color: 'var(--color-delete)', background: 'transparent' }}
-                  onClick={() => removeField(target, idx)}
-                >
-                  <IconX size={12} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
+      ))}</div>
+    </div>
+  );
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-content animate-fade-in" onClick={(e) => e.stopPropagation()} style={{ width: step === 3 ? '800px' : '550px' }}>
-        {/* Wizard Header Progress Bar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--accent)' }}>
-              {block ? 'Edit Logic Block' : 'Create Logic Block'}
-            </h3>
-            <span style={{ fontSize: '12px', color: 'var(--color-dim)', fontFamily: 'var(--font-mono)' }}>
-              Step {step} of 3
-            </span>
-          </div>
-          {/* Progress Tracker */}
-          <div style={{ display: 'flex', height: '4px', background: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
-            <div style={{ width: `${(step / 3) * 100}%`, background: 'var(--accent)', transition: 'width 0.2s ease' }} />
-          </div>
-        </div>
-
-        {/* Step 1: Basic Name */}
-        {step === 1 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div className="form-group">
-              <label className="form-label">Function Name</label>
-              <input
-                type="text"
-                placeholder="e.g. calculateScore, verifyToken"
-                className="input-field input-field-mono"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoFocus
-              />
-              <span style={{ fontSize: '11px', color: 'var(--color-dim)' }}>Must be a valid TypeScript function name.</span>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2: Arguments and Returns */}
-        {step === 2 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {renderFieldEditor('Input Arguments', 'input', inputFields)}
-            <div style={{ borderTop: '1px solid var(--border-color)', margin: '4px 0' }} />
-            {renderFieldEditor('Return Payload Structure', 'output', outputFields)}
-          </div>
-        )}
-
-        {/* Step 3: Logic Implementation */}
-        {step === 3 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: '13px', color: 'var(--color-dim)', fontFamily: 'var(--font-mono)' }}>
-                Exported as: <span style={{ color: 'var(--accent)' }}>{name}</span>(...)
-              </div>
-            </div>
-            <div style={{ height: '400px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-              <CodeEditor
-                value={logic}
-                onChange={setLogic}
-                language="typescript"
-                onSave={handleSave}
-              />
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--color-muted)' }}>
-              Tip: You can use `db` and `schema` imports globally.
-            </div>
-          </div>
-        )}
-
-        {/* Wizard Footer Controls */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
-          <button className="btn" onClick={step === 1 ? onClose : handleBack} style={{ minWidth: '80px' }}>
-            {step === 1 ? 'Cancel' : 'Back'}
-          </button>
-          
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {step === 3 && (
-              <button className="btn btn-primary" onClick={handleSave} style={{ minWidth: '100px', background: 'var(--accent)' }}>
-                Save Logic
-              </button>
-            )}
-            {step < 3 && (
-              <button 
-                className="btn btn-primary" 
-                onClick={handleNext} 
-                style={{ minWidth: '100px', background: 'var(--accent)' }}
-                disabled={step === 1 && !name}
-              >
-                Next Step
-              </button>
-            )}
-          </div>
-        </div>
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-5" onClick={onClose}>
+      <div className="w-full max-w-[850px] bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden flex flex-col animate-in zoom-in-95 duration-150" onClick={e => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center"><h3 className="text-lg font-bold">{block ? 'Edit' : 'Create'} Logic Block</h3><label className="flex items-center gap-2 text-sm font-medium cursor-pointer"><input type="checkbox" className="w-4 h-4" checked={form.isFavorite} onChange={e => setForm({ ...form, isFavorite: e.target.checked })} /> Favorite</label></div>
+        <div className="flex flex-1 min-h-0 bg-white"><div className="w-[300px] border-r border-slate-100 p-6 flex flex-col gap-6 overflow-y-auto">
+          <div className="flex flex-col gap-1.5"><label className="text-xs font-bold text-slate-500 uppercase">Block Name</label><input type="text" className="input-field input-field-mono" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} autoFocus /></div>
+          {renderFields('Inputs', 'inputs')}{renderFields('Outputs', 'outputs')}
+        </div><div className="flex-1 p-6 flex flex-col gap-3">
+          <label className="text-xs font-bold text-slate-500 uppercase">Logic (TypeScript)</label>
+          <div className="flex-1 border rounded overflow-hidden shadow-inner"><CodeEditor value={form.logic} onChange={v => setForm({ ...form, logic: v })} language="typescript" /></div>
+        </div></div>
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2"><button className="btn" onClick={onClose}>Cancel</button><button className="btn btn-primary px-8" onClick={handleSave} disabled={!form.name}>Save Logic Block</button></div>
       </div>
     </div>
   );
