@@ -11,51 +11,39 @@ interface CodeEditorProps {
 export default function CodeEditor({ value, onChange, onSave, language = 'plaintext' }: CodeEditorProps) {
   const extraLibRef = useRef<any>(null);
 
-  // Clean up extra libs on unmount
   useEffect(() => {
-    return () => {
-      if (extraLibRef.current) {
-        extraLibRef.current.dispose();
-      }
-    };
+    return () => { if (extraLibRef.current) extraLibRef.current.dispose(); };
   }, []);
 
   const handleEditorDidMount = (editor: any, monaco: Monaco) => {
-    // Define a custom theme to match Backy's light mode theme
     monaco.editor.defineTheme('backy-light', {
       base: 'vs',
       inherit: true,
       rules: [
         { token: 'comment', foreground: '9ca3af', fontStyle: 'italic' },
-        { token: 'keyword', foreground: '2563eb', fontStyle: 'bold' },
-        { token: 'string', foreground: '059669' },
-        { token: 'number', foreground: 'd97706' },
+        { token: 'keyword', foreground: '3b82f6', fontStyle: 'bold' },
+        { token: 'string', foreground: '10b981' },
+        { token: 'number', foreground: 'f59e0b' },
       ],
       colors: {
-        'editor.background': '#fafafa', // var(--bg-editor)
-        'editor.foreground': '#111827', // var(--color-text)
-        'editor.lineHighlightBackground': '#f3f4f6',
-        'editorGutter.background': '#f3f4f6', // var(--bg-editor-gutter)
-        'editorLineNumber.foreground': '#9ca3af', // var(--color-dim)
-        'editorLineNumber.activeForeground': '#2563eb', // var(--primary)
+        'editor.background': '#ffffff',
+        'editor.foreground': '#0f172a',
+        'editor.lineHighlightBackground': '#f8fafc',
+        'editorGutter.background': '#f8fafc',
+        'editorLineNumber.foreground': '#94a3b8',
+        'editorLineNumber.activeForeground': '#3b82f6',
       }
     });
     
-    // Set active theme
     monaco.editor.setTheme('backy-light');
 
     if (language === 'typescript') {
-      // Configure Typescript compilation/globals
       monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
         target: monaco.languages.typescript.ScriptTarget.ES2020,
         allowNonTsExtensions: true,
         lib: ['es2020'],
       });
-
-      if (extraLibRef.current) {
-        extraLibRef.current.dispose();
-      }
-
+      if (extraLibRef.current) extraLibRef.current.dispose();
       extraLibRef.current = monaco.languages.typescript.typescriptDefaults.addExtraLib(`
         declare const query: Record<string, any>;
         declare const body: Record<string, any>;
@@ -64,7 +52,6 @@ export default function CodeEditor({ value, onChange, onSave, language = 'plaint
       `, 'global-vars.d.ts');
     }
 
-    // Register Save command (Ctrl+S or Cmd+S)
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       if (onSave) onSave();
     });
@@ -73,7 +60,7 @@ export default function CodeEditor({ value, onChange, onSave, language = 'plaint
   const options = {
     minimap: { enabled: false },
     fontSize: 13,
-    fontFamily: 'var(--font-mono)',
+    fontFamily: 'JetBrains Mono, monospace',
     lineHeight: 18,
     scrollbar: {
       vertical: 'visible',
@@ -91,15 +78,7 @@ export default function CodeEditor({ value, onChange, onSave, language = 'plaint
   } as const;
 
   return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      background: 'var(--bg-editor)',
-      border: '1px solid var(--border-color)',
-      borderRadius: '8px',
-      overflow: 'hidden',
-      position: 'relative'
-    }}>
+    <div className="w-full h-full bg-white border border-slate-200 rounded-sm overflow-hidden relative">
       <Editor
         height="100%"
         language={language}
@@ -108,15 +87,7 @@ export default function CodeEditor({ value, onChange, onSave, language = 'plaint
         onMount={handleEditorDidMount}
         options={options}
         loading={
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            height: '100%', 
-            color: 'var(--color-dim)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: '12px'
-          }}>
+          <div className="flex items-center justify-center h-full text-slate-400 font-mono text-xs">
             Initializing code editor...
           </div>
         }
